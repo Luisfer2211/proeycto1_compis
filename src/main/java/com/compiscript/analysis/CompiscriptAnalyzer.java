@@ -3,8 +3,11 @@ package com.compiscript.analysis;
 import com.compiscript.errors.AnalysisError;
 import com.compiscript.errors.CollectingErrorListener;
 import com.compiscript.errors.ErrorType;
+import com.compiscript.errors.SemanticErrorCollector;
 import com.compiscript.parser.CompiscriptLexer;
 import com.compiscript.parser.CompiscriptParser;
+import com.compiscript.semantic.SemanticVisitor;
+import com.compiscript.symbols.SymbolTable;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -17,15 +20,17 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/** Bootstrap analyzer: lexical and syntax analysis only. */
+/** Runs lexical, syntactic, and semantic analysis over Compiscript source code. */
 public class CompiscriptAnalyzer {
 
     public AnalysisResult analyze(File file) throws IOException {
-        return analyze(CharStreams.fromPath(file.toPath(), StandardCharsets.UTF_8));
+        CharStream input = CharStreams.fromPath(file.toPath(), StandardCharsets.UTF_8);
+        return analyze(input);
     }
 
     public AnalysisResult analyze(String source) {
-        return analyze(CharStreams.fromString(source));
+        CharStream input = CharStreams.fromString(source);
+        return analyze(input);
     }
 
     private AnalysisResult analyze(CharStream input) {
@@ -43,11 +48,17 @@ public class CompiscriptAnalyzer {
 
         ParseTree tree = parser.program();
 
+        SymbolTable symbolTable = new SymbolTable();
+        SemanticErrorCollector semanticErrors = new SemanticErrorCollector();
+        SemanticVisitor visitor = new SemanticVisitor(symbolTable, semanticErrors);
+        visitor.visit(tree);
+
         List<AnalysisError> errors = new ArrayList<>();
         errors.addAll(lexerListener.getErrors());
         errors.addAll(parserListener.getErrors());
+        errors.addAll(semanticErrors.getErrors());
         errors.sort(Comparator.comparingInt(AnalysisError::line).thenComparingInt(AnalysisError::column));
 
-        return AnalysisResult.of(errors, tree, null);
+        return AnalysisResult.of(errors, tree, symbolTable);
     }
 }
