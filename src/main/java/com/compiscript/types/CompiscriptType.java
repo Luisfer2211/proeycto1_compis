@@ -9,6 +9,7 @@ public final class CompiscriptType {
 
     public enum Kind {
         INTEGER,
+        FLOAT,
         BOOLEAN,
         STRING,
         NULL,
@@ -36,6 +37,10 @@ public final class CompiscriptType {
 
     public static CompiscriptType integer() {
         return new CompiscriptType(Kind.INTEGER, null, null, null, null);
+    }
+
+    public static CompiscriptType floatType() {
+        return new CompiscriptType(Kind.FLOAT, null, null, null, null);
     }
 
     public static CompiscriptType booleanType() {
@@ -91,7 +96,20 @@ public final class CompiscriptType {
     }
 
     public boolean isNumeric() {
-        return kind == Kind.INTEGER;
+        return kind == Kind.INTEGER || kind == Kind.FLOAT;
+    }
+
+    public static CompiscriptType numericResult(CompiscriptType left, CompiscriptType right) {
+        if (left == null || right == null || left.isError() || right.isError()) {
+            return error();
+        }
+        if (!left.isNumeric() || !right.isNumeric()) {
+            return error();
+        }
+        if (left.kind == Kind.FLOAT || right.kind == Kind.FLOAT) {
+            return floatType();
+        }
+        return integer();
     }
 
     public boolean isError() {
@@ -107,6 +125,9 @@ public final class CompiscriptType {
         }
         if (valueType.kind == Kind.NULL) {
             return kind == Kind.CLASS || kind == Kind.ARRAY || kind == Kind.STRING;
+        }
+        if (kind == Kind.FLOAT && valueType.kind == Kind.INTEGER) {
+            return true;
         }
         if (kind != valueType.kind) {
             return false;
@@ -139,6 +160,9 @@ public final class CompiscriptType {
             return kind == other.kind || kind == Kind.CLASS || other.kind == Kind.CLASS
                     || kind == Kind.ARRAY || other.kind == Kind.ARRAY;
         }
+        if (isNumeric() && other.isNumeric()) {
+            return true;
+        }
         if (kind != other.kind) {
             return false;
         }
@@ -163,6 +187,7 @@ public final class CompiscriptType {
     public String toString() {
         return switch (kind) {
             case INTEGER -> "integer";
+            case FLOAT -> "float";
             case BOOLEAN -> "boolean";
             case STRING -> "string";
             case NULL -> "null";

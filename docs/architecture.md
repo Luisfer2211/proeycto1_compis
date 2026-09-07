@@ -25,10 +25,10 @@
 
 ## Type system
 
-- Primitive types: `integer`, `boolean`, `string`, `null`, `void`
+- Primitive types: `integer`, `float`, `boolean`, `string`, `null`, `void`
 - Composite types: arrays and class types
 - Function types store parameter and return types for call validation
-- `+` supports integer arithmetic and string concatenation
+- `+` supports integer/float arithmetic, integer-to-float promotion, and string concatenation
 
 ## Testing strategy
 

@@ -29,6 +29,9 @@ public final class TypeResolver {
         if (ctx.getText().equals("integer")) {
             return CompiscriptType.integer();
         }
+        if (ctx.getText().equals("float")) {
+            return CompiscriptType.floatType();
+        }
         if (ctx.getText().equals("boolean")) {
             return CompiscriptType.booleanType();
         }

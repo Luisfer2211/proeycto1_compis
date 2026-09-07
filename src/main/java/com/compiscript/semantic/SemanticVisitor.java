@@ -576,7 +576,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
                             "Addition requires numeric operands or string concatenation.");
                     left = CompiscriptType.error();
                 } else {
-                    left = CompiscriptType.integer();
+                    left = CompiscriptType.numericResult(left, right);
                 }
             } else {
                 if (!left.isNumeric() || !right.isNumeric()) {
@@ -584,7 +584,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
                             "Subtraction requires numeric operands.");
                     left = CompiscriptType.error();
                 } else {
-                    left = CompiscriptType.integer();
+                    left = CompiscriptType.numericResult(left, right);
                 }
             }
         }
@@ -601,7 +601,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
                         "Multiplicative operators require numeric operands.");
                 left = CompiscriptType.error();
             } else {
-                left = CompiscriptType.integer();
+                left = CompiscriptType.numericResult(left, right);
             }
         }
         return left;
@@ -620,8 +620,11 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
             }
             if (!operand.isNumeric()) {
                 report(line(ctx), column(ctx), operator, "Unary minus requires a numeric operand.");
+                return CompiscriptType.error();
             }
-            return CompiscriptType.integer();
+            return operand.kind() == CompiscriptType.Kind.FLOAT
+                    ? CompiscriptType.floatType()
+                    : CompiscriptType.integer();
         }
         return visit(ctx.primaryExpr());
     }
@@ -629,7 +632,14 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
     @Override
     public CompiscriptType visitLiteralExpr(CompiscriptParser.LiteralExprContext ctx) {
         if (ctx.Literal() != null) {
-            return ctx.Literal().getText().startsWith("\"") ? CompiscriptType.string() : CompiscriptType.integer();
+            String literal = ctx.Literal().getText();
+            if (literal.startsWith("\"")) {
+                return CompiscriptType.string();
+            }
+            if (literal.contains(".")) {
+                return CompiscriptType.floatType();
+            }
+            return CompiscriptType.integer();
         }
         if (ctx.arrayLiteral() != null) {
             return visit(ctx.arrayLiteral());
@@ -706,7 +716,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
     public CompiscriptType visitIndexExpr(CompiscriptParser.IndexExprContext ctx) {
         CompiscriptType arrayType = visitParent(ctx);
         CompiscriptType indexType = visit(ctx.expression());
-        if (!indexType.isNumeric()) {
+        if (indexType.kind() != CompiscriptType.Kind.INTEGER) {
             report(line(ctx.expression()), column(ctx.expression()), ctx.expression().getText(),
                     "Array index must be an integer.");
         }
@@ -751,7 +761,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
                 }
             } else if (suffix instanceof CompiscriptParser.IndexExprContext index) {
                 CompiscriptType indexType = visit(index.expression());
-                if (!indexType.isNumeric()) {
+                if (indexType.kind() != CompiscriptType.Kind.INTEGER) {
                     report(line(index.expression()), column(index.expression()), index.expression().getText(),
                             "Array index must be an integer.");
                 }
@@ -871,7 +881,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
         }
         if (suffix instanceof CompiscriptParser.IndexExprContext index) {
             CompiscriptType indexType = visit(index.expression());
-            if (!indexType.isNumeric()) {
+            if (indexType.kind() != CompiscriptType.Kind.INTEGER) {
                 report(line(index.expression()), column(index.expression()), index.expression().getText(),
                         "Array index must be an integer.");
             }
