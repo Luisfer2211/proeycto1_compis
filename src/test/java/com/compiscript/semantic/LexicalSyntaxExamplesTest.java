@@ -23,8 +23,8 @@ class LexicalSyntaxExamplesTest {
             AnalysisResult result = analyzer.analyze(file.toFile());
             String name = file.getFileName().toString();
             if (name.contains("sin_errores")) {
-                assertTrue(result.errors().stream().noneMatch(error -> error.type() != ErrorType.SEMANTIC)
-                        || result.errors().isEmpty());
+                assertTrue(result.errors().stream().noneMatch(error ->
+                        error.type() == ErrorType.LEXICAL || error.type() == ErrorType.SYNTAX));
             } else {
                 assertTrue(result.errors().stream().anyMatch(error ->
                         error.type() == ErrorType.LEXICAL || error.type() == ErrorType.SYNTAX));
