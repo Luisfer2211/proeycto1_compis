@@ -12,4 +12,4 @@ function stopLoop(): integer {
   return 0;
 }
 
-let invalidCall: integer = stop() * stop();
+let invalidCall: integer = stop * stop;

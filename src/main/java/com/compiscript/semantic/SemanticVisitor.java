@@ -110,9 +110,9 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
     @Override
     public CompiscriptType visitAssignment(CompiscriptParser.AssignmentContext ctx) {
         checkUnreachable(ctx);
-        if (ctx.Identifier() != null) {
+        if (ctx.expression().size() == 1) {
             String name = ctx.Identifier().getText();
-            CompiscriptType valueType = visit(ctx.expression());
+            CompiscriptType valueType = visit(ctx.expression(0));
             Symbol symbol = symbolTable.resolve(name).orElse(null);
             if (symbol == null) {
                 report(line(ctx), column(ctx.Identifier()), name, "Use of undeclared variable '" + name + "'.");
@@ -129,11 +129,12 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
             return valueType;
         }
 
-        CompiscriptType memberType = visit(ctx.expression(0));
+        CompiscriptType ownerType = visit(ctx.expression(0));
         CompiscriptType valueType = visit(ctx.expression(1));
-        String property = ctx.Identifier(1).getText();
+        String property = ctx.Identifier().getText();
+        CompiscriptType memberType = visitPropertyAccessType(ownerType, property, ctx);
         if (!memberType.isError() && !memberType.isAssignableFrom(valueType)) {
-            report(line(ctx), column(ctx.Identifier(1)), property,
+            report(line(ctx), column(ctx.Identifier()), property,
                     "Cannot assign value of type '" + valueType + "' to member of type '" + memberType + "'.");
         }
         return valueType;
@@ -482,7 +483,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
     @Override
     public CompiscriptType visitAssignExpr(CompiscriptParser.AssignExprContext ctx) {
         CompiscriptType valueType = visit(ctx.assignmentExpr());
-        CompiscriptType targetType = visitLeftHandSide(ctx.leftHandSide());
+        CompiscriptType targetType = evaluateLeftHandSide(ctx.leftHandSide());
         if (!targetType.isError() && !targetType.isAssignableFrom(valueType)) {
             report(line(ctx), column(ctx), ctx.getText(),
                     "Cannot assign value of type '" + valueType + "' to target of type '" + targetType + "'.");
@@ -499,6 +500,9 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
 
     @Override
     public CompiscriptType visitTernaryExpr(CompiscriptParser.TernaryExprContext ctx) {
+        if (ctx.expression().isEmpty()) {
+            return visit(ctx.logicalOrExpr());
+        }
         requireBoolean(ctx.logicalOrExpr(), "ternary condition");
         CompiscriptType trueType = visit(ctx.expression(0));
         CompiscriptType falseType = visit(ctx.expression(1));
@@ -668,7 +672,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
             report(line(ctx), column(ctx.Identifier()), className, "Undefined class '" + className + "'.");
             return CompiscriptType.error();
         }
-        Symbol constructor = classSymbol.members().get("constructor");
+        Symbol constructor = symbolTable.resolveInClassHierarchy(classSymbol, "constructor").orElse(null);
         if (constructor != null) {
             validateCallArguments(ctx.arguments(), constructor, ctx);
         }
@@ -726,7 +730,12 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
         return visit(ctx.getChild(0));
     }
 
-    private CompiscriptType visitLeftHandSide(CompiscriptParser.LeftHandSideContext ctx) {
+    @Override
+    public CompiscriptType visitLeftHandSide(CompiscriptParser.LeftHandSideContext ctx) {
+        return evaluateLeftHandSide(ctx);
+    }
+
+    private CompiscriptType evaluateLeftHandSide(CompiscriptParser.LeftHandSideContext ctx) {
         CompiscriptType current = visit(ctx.primaryAtom());
         for (CompiscriptParser.SuffixOpContext suffix : ctx.suffixOp()) {
             if (suffix instanceof CompiscriptParser.CallExprContext call) {
@@ -760,7 +769,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
     }
 
     private CompiscriptType visitPropertyAccess(CompiscriptParser.LeftHandSideContext lhs, String property, boolean assignment) {
-        CompiscriptType ownerType = visitLeftHandSide(lhs);
+        CompiscriptType ownerType = evaluateLeftHandSide(lhs);
         return visitPropertyAccessType(ownerType, property, lhs);
     }
 
