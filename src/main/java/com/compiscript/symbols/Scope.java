@@ -11,6 +11,7 @@ public class Scope {
     private final ScopeKind kind;
     private final Scope parent;
     private final Map<String, Symbol> symbols = new LinkedHashMap<>();
+    private int frameSize;
 
     public Scope(String name, ScopeKind kind, Scope parent) {
         this.name = name;
@@ -36,5 +37,15 @@ public class Scope {
 
     public Optional<Symbol> lookupLocal(String identifier) {
         return Optional.ofNullable(symbols.get(identifier));
+    }
+
+    public int allocateFrameSlot() {
+        int slot = frameSize;
+        frameSize++;
+        return slot;
+    }
+
+    public int frameSize() {
+        return frameSize;
     }
 }

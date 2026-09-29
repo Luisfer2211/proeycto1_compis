@@ -14,6 +14,7 @@ public class SymbolTable {
     private final Scope globalScope = new Scope("global", ScopeKind.GLOBAL, null);
     private final Deque<Scope> scopeStack = new ArrayDeque<>();
     private final List<Scope> allScopes = new ArrayList<>();
+    private int globalOffset;
 
     public SymbolTable() {
         scopeStack.push(globalScope);
@@ -49,8 +50,50 @@ public class SymbolTable {
         if (scope.symbols().containsKey(symbol.name())) {
             return false;
         }
+        assignStorage(symbol);
         scope.symbols().put(symbol.name(), symbol);
         return true;
+    }
+
+    public boolean isInsideFunction() {
+        return enclosingFunctionScope() != null;
+    }
+
+    public String mintLabel(String name) {
+        Scope scope = currentScope();
+        while (scope != null) {
+            if (scope.kind() == ScopeKind.CLASS || scope.kind() == ScopeKind.FUNCTION) {
+                return scope.name() + "_" + name;
+            }
+            scope = scope.parent();
+        }
+        return "fn_" + name;
+    }
+
+    public void prepareClassLayout(Symbol classSymbol) {
+        if (classSymbol.parentClassName() == null) {
+            classSymbol.setFieldOffsetBase(0);
+            return;
+        }
+        Symbol parent = resolveClass(classSymbol.parentClassName()).orElse(null);
+        classSymbol.setFieldOffsetBase(parent == null ? 0 : parent.fieldSize());
+    }
+
+    public void defineField(Symbol classSymbol, Symbol field) {
+        field.setStorage(StorageClass.FIELD);
+        field.setAddress(classSymbol.allocateFieldOffset());
+        classSymbol.members().put(field.name(), field);
+    }
+
+    public void finishFunction(Symbol function) {
+        Scope frame = enclosingFunctionScope();
+        int size = frame == null ? 0 : frame.frameSize();
+        if (function.label() == null) {
+            function.setLabel(mintLabel(function.name()));
+        }
+        function.setStorage(StorageClass.FRAME);
+        function.setAddress(size);
+        function.setActivationRecord(new ActivationRecord(function.label(), size, function.needsStaticLink()));
     }
 
     public Optional<Symbol> resolve(String name) {
@@ -90,6 +133,40 @@ public class SymbolTable {
         }
         symbol.markInitialized();
         return true;
+    }
+
+    private void assignStorage(Symbol symbol) {
+        if (symbol.kind() == SymbolKind.FUNCTION || symbol.kind() == SymbolKind.CLASS) {
+            if (symbol.label() == null) {
+                symbol.setLabel(symbol.kind() == SymbolKind.CLASS ? symbol.name() : mintLabel(symbol.name()));
+            }
+            return;
+        }
+        if (symbol.kind() == SymbolKind.PARAMETER) {
+            Scope frame = enclosingFunctionScope();
+            symbol.setStorage(StorageClass.PARAMETER);
+            symbol.setAddress(frame == null ? globalOffset++ : frame.allocateFrameSlot());
+            return;
+        }
+        Scope frame = enclosingFunctionScope();
+        if (frame == null) {
+            symbol.setStorage(StorageClass.GLOBAL);
+            symbol.setAddress(globalOffset++);
+            return;
+        }
+        symbol.setStorage(StorageClass.LOCAL);
+        symbol.setAddress(frame.allocateFrameSlot());
+    }
+
+    private Scope enclosingFunctionScope() {
+        Scope scope = currentScope();
+        while (scope != null) {
+            if (scope.kind() == ScopeKind.FUNCTION) {
+                return scope;
+            }
+            scope = scope.parent();
+        }
+        return null;
     }
 
     public String currentScopePath() {

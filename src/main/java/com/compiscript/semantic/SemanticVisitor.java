@@ -171,8 +171,11 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
 
         CompiscriptType functionType = CompiscriptType.function(returnType, parameterTypes);
         Symbol functionSymbol = new Symbol(name, SymbolKind.FUNCTION, functionType, line, false);
+        functionSymbol.setLabel(symbolTable.mintLabel(name));
         functionSymbol.parameters().addAll(parameterSymbols);
 
+        boolean nested = symbolTable.isInsideFunction();
+        functionSymbol.setNeedsStaticLink(nested);
         if (!symbolTable.define(functionSymbol)) {
             report(line, column, name, "Redeclaration of function '" + name + "' in the same scope.");
         }
@@ -183,11 +186,16 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
         currentReturnType = returnType;
         unreachable = false;
 
+        if (nested) {
+            Symbol staticLink = new Symbol("$static_link", SymbolKind.PARAMETER, CompiscriptType.integer(), line, false);
+            symbolTable.define(staticLink);
+        }
         for (Symbol parameter : parameterSymbols) {
             symbolTable.define(parameter);
         }
 
         visit(ctx.block());
+        symbolTable.finishFunction(functionSymbol);
         symbolTable.exitScope();
         functionDepth--;
         currentReturnType = previousReturn;
@@ -208,9 +216,11 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
 
         Symbol classSymbol = new Symbol(name, SymbolKind.CLASS, CompiscriptType.classType(name), line, false);
         classSymbol.setParentClassName(parentName);
+        classSymbol.setLabel(name);
         if (!symbolTable.define(classSymbol)) {
             report(line, column, name, "Redeclaration of class '" + name + "' in the same scope.");
         }
+        symbolTable.prepareClassLayout(classSymbol);
 
         symbolTable.enterScope(name, ScopeKind.CLASS);
         String previousClass = currentClassName;
@@ -220,7 +230,10 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
                 CompiscriptParser.FunctionDeclarationContext function = member.functionDeclaration();
                 String memberName = function.Identifier().getText();
                 Symbol memberSymbol = buildClassMemberFunction(function, classSymbol);
+                memberSymbol.setLabel(name + "_" + memberName);
+                memberSymbol.setNeedsReceiver(true);
                 classSymbol.members().put(memberName, memberSymbol);
+                symbolTable.define(memberSymbol);
                 visitClassMemberFunction(function, memberSymbol);
             } else if (member.variableDeclaration() != null) {
                 CompiscriptParser.VariableDeclarationContext variable = member.variableDeclaration();
@@ -237,7 +250,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
                     }
                     memberSymbol.markInitialized();
                 }
-                classSymbol.members().put(memberName, memberSymbol);
+                symbolTable.defineField(classSymbol, memberSymbol);
             } else if (member.constantDeclaration() != null) {
                 CompiscriptParser.ConstantDeclarationContext constant = member.constantDeclaration();
                 String memberName = constant.Identifier().getText();
@@ -246,7 +259,7 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
                         : CompiscriptType.error();
                 Symbol memberSymbol = new Symbol(memberName, SymbolKind.CONSTANT, memberType, line(constant), false);
                 memberSymbol.markInitialized();
-                classSymbol.members().put(memberName, memberSymbol);
+                symbolTable.defineField(classSymbol, memberSymbol);
             }
         }
         symbolTable.exitScope();
@@ -284,10 +297,14 @@ public class SemanticVisitor extends CompiscriptBaseVisitor<CompiscriptType> {
         CompiscriptType previousReturn = currentReturnType;
         currentReturnType = memberSymbol.type().returnType();
         unreachable = false;
+        Symbol receiver = new Symbol("this", SymbolKind.PARAMETER, CompiscriptType.classType(currentClassName),
+                line(ctx), false);
+        symbolTable.define(receiver);
         for (Symbol parameter : memberSymbol.parameters()) {
             symbolTable.define(parameter);
         }
         visit(ctx.block());
+        symbolTable.finishFunction(memberSymbol);
         symbolTable.exitScope();
         functionDepth--;
         currentClassName = previousClass;
