@@ -4,8 +4,10 @@ import com.compiscript.errors.AnalysisError;
 import com.compiscript.symbols.Scope;
 import com.compiscript.symbols.Symbol;
 import com.compiscript.symbols.SymbolTable;
+import com.compiscript.tac.TacProgram;
 import org.antlr.v4.runtime.tree.ParseTree;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** Result of analyzing a Compiscript source file or snippet. */
@@ -13,11 +15,13 @@ public record AnalysisResult(
         boolean successful,
         List<AnalysisError> errors,
         ParseTree parseTree,
-        SymbolTable symbolTable
+        SymbolTable symbolTable,
+        TacProgram intermediateCode
 ) {
 
-    public static AnalysisResult of(List<AnalysisError> errors, ParseTree parseTree, SymbolTable symbolTable) {
-        return new AnalysisResult(errors.isEmpty(), errors, parseTree, symbolTable);
+    public static AnalysisResult of(List<AnalysisError> errors, ParseTree parseTree, SymbolTable symbolTable,
+                                    TacProgram intermediateCode) {
+        return new AnalysisResult(errors.isEmpty(), errors, parseTree, symbolTable, intermediateCode);
     }
 
     public long lexicalErrorCount() {
@@ -36,15 +40,27 @@ public record AnalysisResult(
         if (symbolTable == null) {
             return List.of();
         }
-        return symbolTable.allScopes().stream()
-                .flatMap(scope -> scope.symbols().values().stream().map(symbol -> toRow(scope, symbol)))
-                .toList();
+        List<SymbolRow> rows = new ArrayList<>();
+        for (Scope scope : symbolTable.allScopes()) {
+            String scopePath = buildScopePath(scope);
+            for (Symbol symbol : scope.symbols().values()) {
+                rows.add(toRow(scopePath, symbol));
+                if (symbol.kind().name().equals("CLASS")) {
+                    for (Symbol member : symbol.members().values()) {
+                        if (member.storage() != null && member.storage().name().equals("FIELD")) {
+                            rows.add(toRow(scopePath + "/" + symbol.name(), member));
+                        }
+                    }
+                }
+            }
+        }
+        return rows;
     }
 
-    private SymbolRow toRow(Scope scope, Symbol symbol) {
-        String scopePath = buildScopePath(scope);
+    private SymbolRow toRow(String scopePath, Symbol symbol) {
+        String storage = symbol.storage() == null ? "" : symbol.storage().name();
         return new SymbolRow(scopePath, symbol.name(), symbol.kind().name(), symbol.type().toString(),
-                symbol.isInitialized(), symbol.line());
+                storage, symbol.address(), symbol.isInitialized(), symbol.line());
     }
 
     private String buildScopePath(Scope scope) {
@@ -54,6 +70,7 @@ public record AnalysisResult(
         return buildScopePath(scope.parent()) + "/" + scope.name();
     }
 
-    public record SymbolRow(String scope, String name, String kind, String type, boolean initialized, int line) {
+    public record SymbolRow(String scope, String name, String kind, String type, String storage, int address,
+                            boolean initialized, int line) {
     }
 }

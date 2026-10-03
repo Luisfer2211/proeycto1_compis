@@ -8,6 +8,8 @@ import com.compiscript.parser.CompiscriptLexer;
 import com.compiscript.parser.CompiscriptParser;
 import com.compiscript.semantic.SemanticVisitor;
 import com.compiscript.symbols.SymbolTable;
+import com.compiscript.tac.TacGenerator;
+import com.compiscript.tac.TacProgram;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -59,6 +61,9 @@ public class CompiscriptAnalyzer {
         errors.addAll(semanticErrors.getErrors());
         errors.sort(Comparator.comparingInt(AnalysisError::line).thenComparingInt(AnalysisError::column));
 
-        return AnalysisResult.of(errors, tree, symbolTable);
+        TacProgram intermediateCode = errors.isEmpty()
+                ? new TacGenerator(symbolTable).generate(tree)
+                : TacProgram.suppressed();
+        return AnalysisResult.of(errors, tree, symbolTable, intermediateCode);
     }
 }
