@@ -2,7 +2,7 @@
 
 Lexical, syntax, and semantic analyzer for the **Compiscript** language (`.cps`), built with **Java 17 + ANTLR4 + Swing**.
 
-Project 01 — Compiler Construction, UVG.
+Project 02 — Compiler Construction, UVG. Lexical, syntax, and semantic analysis, plus three-address intermediate code.
 
 ## Requirements
 
@@ -32,11 +32,14 @@ src/main/java/com/compiscript/errors/                  error model and collector
 src/main/java/com/compiscript/symbols/                 symbol table and scopes
 src/main/java/com/compiscript/types/                   semantic type system
 src/main/java/com/compiscript/semantic/                semantic visitor
+src/main/java/com/compiscript/tac/                     three-address code generator
 src/main/java/com/compiscript/analysis/                analysis pipeline
 src/main/java/com/compiscript/gui/                     Swing IDE
 src/test/resources/cps/semantic/                       semantic test fixtures
+src/test/resources/cps/tac/                            intermediate-code fixtures
 ejemplos/                                              sample .cps files for grading
 docs/architecture.md                                   implementation notes
+docs/intermediate-code.md                              intermediate-language design
 ```
 
 ## IDE features
@@ -44,8 +47,9 @@ docs/architecture.md                                   implementation notes
 - Editable source editor
 - File picker for `.cps` files
 - Error table (lexical, syntax, semantic)
-- AST tree visualization
-- Symbol table with scope information
+- AST drawn as boxes and edges
+- Symbol table with scope, storage class, and address
+- Intermediate code tab. It stays empty when the program has errors
 
 ## Sample files
 
@@ -59,6 +63,7 @@ docs/architecture.md                                   implementation notes
 | `src/test/resources/cps/semantic/functions_bad.cps` | Function rule violations |
 | `src/test/resources/cps/semantic/classes_ok.cps` | Valid classes and inheritance |
 | `src/test/resources/cps/semantic/dead_code_bad.cps` | Dead code detection |
+| `ejemplos/tac/` | Intermediate-code samples for grading |
 
 ## Semantic rules implemented
 
