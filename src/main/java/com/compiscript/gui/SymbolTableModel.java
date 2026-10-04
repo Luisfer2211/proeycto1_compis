@@ -9,7 +9,9 @@ import java.util.List;
 /** Table model for symbol table rows displayed in the IDE. */
 public class SymbolTableModel extends AbstractTableModel {
 
-    private static final String[] COLUMNS = {"Scope", "Name", "Kind", "Type", "Initialized", "Line"};
+    private static final String[] COLUMNS = {
+            "Scope", "Name", "Kind", "Type", "Storage", "Address", "Initialized", "Line"
+    };
 
     private List<AnalysisResult.SymbolRow> rows = new ArrayList<>();
 
@@ -36,8 +38,8 @@ public class SymbolTableModel extends AbstractTableModel {
     @Override
     public Class<?> getColumnClass(int columnIndex) {
         return switch (columnIndex) {
-            case 5 -> Integer.class;
-            case 4 -> Boolean.class;
+            case 5, 7 -> Integer.class;
+            case 6 -> Boolean.class;
             default -> String.class;
         };
     }
@@ -50,8 +52,10 @@ public class SymbolTableModel extends AbstractTableModel {
             case 1 -> row.name();
             case 2 -> row.kind();
             case 3 -> row.type();
-            case 4 -> row.initialized();
-            case 5 -> row.line();
+            case 4 -> row.storage();
+            case 5 -> row.address() < 0 ? "" : row.address();
+            case 6 -> row.initialized();
+            case 7 -> row.line();
             default -> "";
         };
     }

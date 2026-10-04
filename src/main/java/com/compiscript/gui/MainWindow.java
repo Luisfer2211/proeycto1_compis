@@ -6,7 +6,6 @@ import com.compiscript.analysis.CompiscriptAnalyzer;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
-import javax.swing.tree.DefaultMutableTreeNode;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
@@ -28,10 +27,11 @@ public class MainWindow extends JFrame {
     private JButton analyzeButton;
     private JButton saveButton;
     private JLabel bannerLabel;
-    private JTree astTree;
+    private AstDiagramPanel astDiagram;
+    private JTextArea intermediateCodeArea;
 
     public MainWindow() {
-        super("Compiscript Semantic Analyzer IDE");
+        super("Compiscript Compiler IDE");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1100, 750);
         setLocationRelativeTo(null);
@@ -78,9 +78,8 @@ public class MainWindow extends JFrame {
         JScrollPane errorScroll = new JScrollPane(errorTable);
         errorScroll.setBorder(BorderFactory.createTitledBorder("Errors"));
 
-        astTree = new JTree(new DefaultMutableTreeNode("AST"));
-        astTree.setShowsRootHandles(true);
-        JScrollPane astScroll = new JScrollPane(astTree);
+        astDiagram = new AstDiagramPanel();
+        JScrollPane astScroll = new JScrollPane(astDiagram);
         astScroll.setBorder(BorderFactory.createTitledBorder("AST"));
 
         JTable symbolTable = new JTable(symbolTableModel);
@@ -89,10 +88,17 @@ public class MainWindow extends JFrame {
         JScrollPane symbolScroll = new JScrollPane(symbolTable);
         symbolScroll.setBorder(BorderFactory.createTitledBorder("Symbol Table"));
 
+        intermediateCodeArea = new JTextArea();
+        intermediateCodeArea.setEditable(false);
+        intermediateCodeArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        JScrollPane codeScroll = new JScrollPane(intermediateCodeArea);
+        codeScroll.setBorder(BorderFactory.createTitledBorder("Intermediate Code"));
+
         JTabbedPane resultTabs = new JTabbedPane();
         resultTabs.addTab("Errors", errorScroll);
         resultTabs.addTab("AST", astScroll);
         resultTabs.addTab("Symbols", symbolScroll);
+        resultTabs.addTab("Intermediate Code", codeScroll);
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, editorScroll, resultTabs);
         splitPane.setResizeWeight(0.45);
@@ -154,10 +160,13 @@ public class MainWindow extends JFrame {
         AnalysisResult result = analyzer.analyze(editorArea.getText());
         errorTableModel.setErrors(result.errors());
         symbolTableModel.setRows(result.symbolRows());
-        astTree.setModel(new javax.swing.tree.DefaultTreeModel(
-                result.parseTree() == null
-                        ? new DefaultMutableTreeNode("No parse tree")
-                        : AstTreeBuilder.build(result.parseTree())));
+        astDiagram.setTree(result.parseTree());
+        if (result.intermediateCode() == null || result.intermediateCode().isSuppressed()) {
+            intermediateCodeArea.setText("Intermediate code was not generated because the program has errors.");
+        } else {
+            intermediateCodeArea.setText(result.intermediateCode().render());
+        }
+        intermediateCodeArea.setCaretPosition(0);
         updateBanner(result);
     }
 
