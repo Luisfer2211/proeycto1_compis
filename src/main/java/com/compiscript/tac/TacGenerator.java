@@ -613,6 +613,7 @@ public class TacGenerator extends CompiscriptBaseVisitor<TacOperand> {
         if (program.lines().isEmpty() || !program.lines().get(program.lines().size() - 1).startsWith("return")) {
             program.add("return");
         }
+        program.add("leave " + function.label());
         functionDepth--;
         if (skip != null) {
             program.add(skip + ":");
