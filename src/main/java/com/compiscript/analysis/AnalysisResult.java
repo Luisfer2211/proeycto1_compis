@@ -4,6 +4,7 @@ import com.compiscript.errors.AnalysisError;
 import com.compiscript.symbols.Scope;
 import com.compiscript.symbols.Symbol;
 import com.compiscript.symbols.SymbolTable;
+import com.compiscript.mips.MipsProgram;
 import com.compiscript.tac.TacProgram;
 import org.antlr.v4.runtime.tree.ParseTree;
 
@@ -16,12 +17,13 @@ public record AnalysisResult(
         List<AnalysisError> errors,
         ParseTree parseTree,
         SymbolTable symbolTable,
-        TacProgram intermediateCode
+        TacProgram intermediateCode,
+        MipsProgram assembly
 ) {
 
     public static AnalysisResult of(List<AnalysisError> errors, ParseTree parseTree, SymbolTable symbolTable,
-                                    TacProgram intermediateCode) {
-        return new AnalysisResult(errors.isEmpty(), errors, parseTree, symbolTable, intermediateCode);
+                                    TacProgram intermediateCode, MipsProgram assembly) {
+        return new AnalysisResult(errors.isEmpty(), errors, parseTree, symbolTable, intermediateCode, assembly);
     }
 
     public long lexicalErrorCount() {

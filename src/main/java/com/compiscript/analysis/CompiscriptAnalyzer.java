@@ -8,6 +8,8 @@ import com.compiscript.parser.CompiscriptLexer;
 import com.compiscript.parser.CompiscriptParser;
 import com.compiscript.semantic.SemanticVisitor;
 import com.compiscript.symbols.SymbolTable;
+import com.compiscript.mips.MipsGenerator;
+import com.compiscript.mips.MipsProgram;
 import com.compiscript.tac.TacGenerator;
 import com.compiscript.tac.TacProgram;
 import org.antlr.v4.runtime.CharStream;
@@ -64,6 +66,9 @@ public class CompiscriptAnalyzer {
         TacProgram intermediateCode = errors.isEmpty()
                 ? new TacGenerator(symbolTable).generate(tree)
                 : TacProgram.suppressed();
-        return AnalysisResult.of(errors, tree, symbolTable, intermediateCode);
+        MipsProgram assembly = errors.isEmpty()
+                ? new MipsGenerator().generate(intermediateCode, symbolTable)
+                : MipsProgram.suppressed();
+        return AnalysisResult.of(errors, tree, symbolTable, intermediateCode, assembly);
     }
 }
