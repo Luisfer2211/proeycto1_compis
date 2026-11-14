@@ -10,6 +10,7 @@ import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.List;
 
 /** Main IDE window for editing and analyzing Compiscript source files. */
 public class MainWindow extends JFrame {
@@ -28,7 +29,12 @@ public class MainWindow extends JFrame {
     private JButton saveButton;
     private JLabel bannerLabel;
     private AstDiagramPanel astDiagram;
+    private ActivationDiagramPanel activationDiagram;
     private JTextArea intermediateCodeArea;
+    private JTextArea assemblyArea;
+    private JButton saveAsmButton;
+    private final RegisterTableModel registerTableModel = new RegisterTableModel();
+    private String currentAssembly = "";
 
     public MainWindow() {
         super("Compiscript Compiler IDE");
@@ -56,11 +62,16 @@ public class MainWindow extends JFrame {
         analyzeButton = new JButton("Analyze");
         analyzeButton.addActionListener(event -> analyzeCurrentSource());
 
+        saveAsmButton = new JButton("Save .asm");
+        saveAsmButton.setEnabled(false);
+        saveAsmButton.addActionListener(event -> saveAssembly());
+
         fileLabel = new JLabel("No file selected");
 
         panel.add(openButton);
         panel.add(saveButton);
         panel.add(analyzeButton);
+        panel.add(saveAsmButton);
         panel.add(fileLabel);
         return panel;
     }
@@ -94,11 +105,30 @@ public class MainWindow extends JFrame {
         JScrollPane codeScroll = new JScrollPane(intermediateCodeArea);
         codeScroll.setBorder(BorderFactory.createTitledBorder("Intermediate Code"));
 
+        assemblyArea = new JTextArea();
+        assemblyArea.setEditable(false);
+        assemblyArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        JScrollPane assemblyScroll = new JScrollPane(assemblyArea);
+        assemblyScroll.setBorder(BorderFactory.createTitledBorder("Assembly"));
+
+        activationDiagram = new ActivationDiagramPanel();
+        JScrollPane activationScroll = new JScrollPane(activationDiagram);
+        activationScroll.setBorder(BorderFactory.createTitledBorder("Activation"));
+
+        JTable registerTable = new JTable(registerTableModel);
+        registerTable.setAutoCreateRowSorter(true);
+        registerTable.setFillsViewportHeight(true);
+        JScrollPane registerScroll = new JScrollPane(registerTable);
+        registerScroll.setBorder(BorderFactory.createTitledBorder("Registers"));
+
         JTabbedPane resultTabs = new JTabbedPane();
         resultTabs.addTab("Errors", errorScroll);
         resultTabs.addTab("AST", astScroll);
         resultTabs.addTab("Symbols", symbolScroll);
         resultTabs.addTab("Intermediate Code", codeScroll);
+        resultTabs.addTab("Assembly", assemblyScroll);
+        resultTabs.addTab("Activation", activationScroll);
+        resultTabs.addTab("Registers", registerScroll);
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, editorScroll, resultTabs);
         splitPane.setResizeWeight(0.45);
@@ -156,6 +186,29 @@ public class MainWindow extends JFrame {
         }
     }
 
+    private void saveAssembly() {
+        if (currentAssembly.isEmpty()) {
+            return;
+        }
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileFilter(new FileNameExtensionFilter("MIPS assembly (*.asm)", "asm"));
+        chooser.setSelectedFile(new File("program.asm"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File target = chooser.getSelectedFile();
+        if (!target.getName().endsWith(".asm")) {
+            target = new File(target.getParentFile(), target.getName() + ".asm");
+        }
+        try {
+            Files.writeString(target.toPath(), currentAssembly);
+            bannerLabel.setText("Assembly saved to " + target.getName() + ".");
+            bannerLabel.setForeground(SUCCESS_COLOR);
+        } catch (IOException exception) {
+            showError("Could not save assembly: " + exception.getMessage());
+        }
+    }
+
     private void analyzeCurrentSource() {
         AnalysisResult result = analyzer.analyze(editorArea.getText());
         errorTableModel.setErrors(result.errors());
@@ -167,6 +220,20 @@ public class MainWindow extends JFrame {
             intermediateCodeArea.setText(result.intermediateCode().render());
         }
         intermediateCodeArea.setCaretPosition(0);
+        if (result.assembly() == null || result.assembly().isSuppressed()) {
+            currentAssembly = "";
+            assemblyArea.setText("Assembly was not generated because the program has errors.");
+            activationDiagram.setActivation(null);
+            registerTableModel.setDecisions(List.of());
+            saveAsmButton.setEnabled(false);
+        } else {
+            currentAssembly = result.assembly().render();
+            assemblyArea.setText(currentAssembly);
+            activationDiagram.setActivation(result.assembly().activation());
+            registerTableModel.setDecisions(result.assembly().decisions());
+            saveAsmButton.setEnabled(true);
+        }
+        assemblyArea.setCaretPosition(0);
         updateBanner(result);
     }
 
